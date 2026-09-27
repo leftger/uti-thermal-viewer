@@ -43,12 +43,33 @@ Analysis and reverse-engineering of the official UNI-T `UTi-Live-Screen-1.68.exe
 
 ## Features
 
+- **Rich `egui` Native Desktop Application**: Built with `eframe` (Wgpu backend) featuring:
+  - **Live 25 FPS Video Viewport**: Scalable display of the camera stream with aspect-ratio preservation.
+  - **Real-Time Temperature History Plot**: Rolling multi-channel temperature graph (`egui_plot`) displaying Max, Min, and Center temperatures over time.
+  - **Dynamic Spot Overlays**:
+    - 🔴 **Hot Spot Tracker**: Real-time crosshair tracking the hottest pixel with temperature label.
+    - 🔵 **Cold Spot Tracker**: Real-time crosshair tracking the coldest pixel.
+    - 🟢 **Center Crosshair**: Reticle displaying center spot temperature.
+    - 🟡 **Interactive Hover Inspector**: Hover over any pixel on the live feed to inspect pixel coordinates and temperatures.
+  - **Visual Thermal Colorbar**: Gradient temperature bar with dynamic tick labels.
+  - **High-Temperature Alarm**: Configurable alarm threshold with visual warning alerts.
+  - **Built-in Thermal Simulation / Demo Mode**: Realistic synthetic thermal PCB scene with drifting hotspots when the camera is not plugged in, so you can test all features offline.
+  - **One-Click Snapshots & CSV Logging**: Save PNG snapshots and record temperature telemetry to CSV.
+  - **Offline BMP Analysis Modal**: Load any `.bmp` saved on the camera's SD card, inspect raw radiometric data, and export clean PNGs and temperature CSVs.
 - **Automatic Device Discovery**: Auto-detects connected UTi-260B devices across Linux (V4L2), Windows (MSMF), and macOS (AVFoundation).
-- **Zero-Copy Frame Processing**: Fast YUYV to RGB, RGBA, and Grayscale conversion.
-- **Real-Time Telemetry Extraction**: High-precision maximum, warning, and emissivity readout.
-- **Terminal TrueColor Preview**: View live thermal imaging directly in your terminal using 24-bit ANSI colors.
-- **Snapshot Analysis**: Full support for reading raw radiometric sensor data and metadata from UTi260B `.bmp` files.
-- **Temperature Export**: Export per-pixel temperature matrices to CSV.
+- **Headless CLI Tools**: Stream telemetry, capture frames, preview in terminal via ANSI 24-bit TrueColor, or parse SD card images.
+
+---
+
+## Launching the GUI App
+
+Simply run:
+```bash
+cargo run --release
+```
+*(or `cargo run --bin uti260b`)*
+
+When the UTi-260B is connected and set to **"PC Camera"** in device settings, the app automatically connects to the live stream. If no camera is plugged in, it automatically enters **Demo / Simulation Mode** with realistic thermal scene dynamics so you can explore all features immediately!
 
 ---
 
