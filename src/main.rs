@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use clap::{Parser, Subcommand};
-use uti_thermal_viewer::{query_devices, Error, Palette, Result, UtiApp, UtiBmpImage, UtiCamera};
+use uti_thermal_viewer::{query_devices, Error, Palette, Result, TelemetryLogRecord, UtiApp, UtiBmpImage, UtiCamera};
 
 #[derive(Parser)]
 #[command(name = "uti-thermal-viewer")]
@@ -30,16 +30,20 @@ enum Commands {
         #[arg(short, long)]
         index: Option<u32>,
 
-        /// Output image path (.png or .bmp)
-        #[arg(short, long, default_value = "uti260b_snapshot.png")]
-        output: PathBuf,
+        /// Output image path (.png or .bmp, defaults to timestamped filename)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
 
         /// Output telemetry to JSON file
         #[arg(long)]
         json: Option<PathBuf>,
+
+        /// Output telemetry to CSV file
+        #[arg(long)]
+        csv: Option<PathBuf>,
     },
 
-    /// Live telemetry streaming in the console
+    /// Live telemetry streaming in the console with optional CSV/JSON logging
     Stream {
         /// Camera device index (defaults to auto-detecting UTi-260B)
         #[arg(short, long)]
@@ -48,6 +52,14 @@ enum Commands {
         /// Maximum number of frames to capture (0 = indefinite)
         #[arg(short, long, default_value_t = 0)]
         count: u64,
+
+        /// Log telemetry data continuously to a CSV file
+        #[arg(long)]
+        csv: Option<PathBuf>,
+
+        /// Log telemetry data continuously to a JSON / JSONL file
+        #[arg(long)]
+        json: Option<PathBuf>,
     },
 
     /// Live ANSI TrueColor thermal preview directly in the terminal
@@ -77,6 +89,10 @@ enum Commands {
         /// Export per-pixel temperature matrix to CSV
         #[arg(long)]
         export_csv: Option<PathBuf>,
+
+        /// Export radiometric data and per-pixel temperatures to JSON
+        #[arg(long)]
+        export_json: Option<PathBuf>,
     },
 }
 
@@ -132,7 +148,7 @@ fn main() -> Result<()> {
             }
         }
 
-        Some(Commands::Capture { index, output, json }) => {
+        Some(Commands::Capture { index, output, json, csv }) => {
             let mut camera = match index {
                 Some(idx) => UtiCamera::open(idx)?,
                 None => UtiCamera::open_default()?,
@@ -141,25 +157,57 @@ fn main() -> Result<()> {
             println!("Capturing frame from camera...");
             let frame = camera.next_frame()?;
 
+            let output_path = output.unwrap_or_else(|| {
+                let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+                PathBuf::from(format!("uti260b_snapshot_{}.png", timestamp))
+            });
+
             if let Some(telem) = &frame.telemetry {
                 println!("Captured Telemetry: {}", telem);
                 if let Some(json_path) = json {
-                    let json_str = serde_json::to_string_pretty(telem).unwrap();
+                    let json_str = serde_json::to_string_pretty(telem).map_err(|e| {
+                        Error::Capture(format!("JSON serialization error: {}", e))
+                    })?;
                     std::fs::write(&json_path, json_str)?;
                     println!("Saved telemetry JSON to {:?}", json_path);
+                }
+                if let Some(csv_path) = csv {
+                    use std::io::Write;
+                    let mut file = std::fs::File::create(&csv_path)?;
+                    writeln!(file, "max_temp_c,warn_temp_c,emissivity")?;
+                    writeln!(file, "{:.2},{:.2},{:.2}", telem.max_temp_c, telem.warn_temp_c, telem.emissivity)?;
+                    println!("Saved telemetry CSV to {:?}", csv_path);
                 }
             } else {
                 println!("Frame captured (no extended telemetry footer found).");
             }
 
-            frame.save_png(&output)?;
-            println!("Saved snapshot to {:?}", output);
+            frame.save_png(&output_path)?;
+            println!("Saved snapshot to {:?}", output_path);
         }
 
-        Some(Commands::Stream { index, count }) => {
+        Some(Commands::Stream { index, count, csv, json }) => {
             let mut camera = match index {
                 Some(idx) => UtiCamera::open(idx)?,
                 None => UtiCamera::open_default()?,
+            };
+
+            let mut csv_writer = if let Some(csv_path) = &csv {
+                use std::io::Write;
+                let mut file = std::fs::File::create(csv_path)?;
+                writeln!(file, "{}", TelemetryLogRecord::csv_header())?;
+                println!("Logging telemetry CSV to {:?}", csv_path);
+                Some(file)
+            } else {
+                None
+            };
+
+            let mut json_writer = if let Some(json_path) = &json {
+                let file = std::fs::File::create(json_path)?;
+                println!("Logging telemetry JSON Lines to {:?}", json_path);
+                Some(file)
+            } else {
+                None
             };
 
             println!("Streaming from UTi-260B (press Ctrl+C to stop)...");
@@ -170,6 +218,34 @@ fn main() -> Result<()> {
             while count == 0 || frame_count < count {
                 let frame = camera.next_frame()?;
                 frame_count += 1;
+                let elapsed = start.elapsed().as_secs_f64();
+
+                if let Some(telem) = &frame.telemetry {
+                    let fps = if elapsed > 0.0 { frame_count as f32 / elapsed as f32 } else { 0.0 };
+                    let record = TelemetryLogRecord {
+                        timestamp: chrono::Local::now().to_rfc3339(),
+                        elapsed_secs: elapsed,
+                        frame: frame_count,
+                        max_temp_c: telem.max_temp_c,
+                        warn_temp_c: telem.warn_temp_c,
+                        min_temp_c: None,
+                        center_temp_c: None,
+                        emissivity: telem.emissivity,
+                        fps: Some(fps),
+                    };
+
+                    if let Some(f) = &mut csv_writer {
+                        use std::io::Write;
+                        let _ = writeln!(f, "{}", record.to_csv_row());
+                    }
+
+                    if let Some(f) = &mut json_writer {
+                        use std::io::Write;
+                        if let Ok(line) = record.to_json_line() {
+                            let _ = writeln!(f, "{}", line);
+                        }
+                    }
+                }
 
                 if last_print.elapsed() >= std::time::Duration::from_millis(500) {
                     let elapsed = start.elapsed().as_secs_f32();
@@ -185,7 +261,7 @@ fn main() -> Result<()> {
                     last_print = std::time::Instant::now();
                 }
             }
-            println!("\nStreaming finished.");
+            println!("\nStreaming finished (captured {} frames).", frame_count);
         }
 
         Some(Commands::Preview { index, width, height }) => {
@@ -212,6 +288,7 @@ fn main() -> Result<()> {
             file,
             export_png,
             export_csv,
+            export_json,
         }) => {
             println!("Parsing UTi260B BMP file: {:?}", file);
             let bmp = UtiBmpImage::from_file(&file)?;
@@ -239,6 +316,14 @@ fn main() -> Result<()> {
                 let csv_data = bmp.export_temperature_csv();
                 std::fs::write(&csv_path, csv_data)?;
                 println!("Exported temperature matrix CSV to {:?}", csv_path);
+            }
+
+            if let Some(json_path) = export_json {
+                let json_data = bmp.export_temperature_json().map_err(|e| {
+                    Error::Capture(format!("JSON export error: {}", e))
+                })?;
+                std::fs::write(&json_path, json_data)?;
+                println!("Exported radiometric JSON to {:?}", json_path);
             }
         }
     }

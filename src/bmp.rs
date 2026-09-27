@@ -3,6 +3,7 @@ use std::io::Read;
 use std::path::Path;
 use chrono::{DateTime, Utc};
 use image::{Rgb, RgbImage};
+use serde::Serialize;
 
 use crate::error::{Error, Result};
 use crate::palette::Palette;
@@ -181,6 +182,36 @@ impl UtiBmpImage {
         }
         out
     }
+
+    /// Exports radiometric BMP data, metadata, calibration, and per-pixel temperatures to JSON.
+    pub fn export_temperature_json(&self) -> serde_json::Result<String> {
+        #[derive(Serialize)]
+        struct BmpJsonExport<'a> {
+            width: u32,
+            height: u32,
+            units: String,
+            temp_max: f32,
+            temp_min: f32,
+            temp_center: f32,
+            emissivity: f32,
+            timestamp: Option<String>,
+            temperatures: &'a Vec<Vec<f32>>,
+        }
+
+        let export = BmpJsonExport {
+            width: self.width,
+            height: self.height,
+            units: self.temp_units.to_string(),
+            temp_max: self.temp_max,
+            temp_min: self.temp_min,
+            temp_center: self.temp_center,
+            emissivity: self.emissivity,
+            timestamp: self.timestamp.as_ref().map(|dt| dt.to_rfc3339()),
+            temperatures: &self.temperature_matrix,
+        };
+
+        serde_json::to_string_pretty(&export)
+    }
 }
 
 #[cfg(test)]
@@ -236,6 +267,11 @@ mod tests {
         // Test CSV export
         let csv = parsed.export_temperature_csv();
         assert!(csv.contains("Max: 35.00"));
+
+        // Test JSON export
+        let json = parsed.export_temperature_json().expect("Should export JSON");
+        assert!(json.contains("\"temp_max\": 35.0"));
+        assert!(json.contains("\"temperatures\":"));
 
         // Test clean image export
         let img = parsed.render_clean_image(Some(Palette::Iron));

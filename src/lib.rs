@@ -52,4 +52,4 @@ pub use frame::LiveFrame;
 pub use gui::UtiApp;
 pub use palette::Palette;
 pub use simulated::SimulatedCamera;
-pub use telemetry::Telemetry;
+pub use telemetry::{Telemetry, TelemetryLogRecord};

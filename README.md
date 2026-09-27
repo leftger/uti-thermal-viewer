@@ -11,7 +11,7 @@ Featuring an interactive native GUI built with [`egui`](https://github.com/emilk
 
 ---
 
-![UTi-Thermal-Viewer Screenshot](assets/screenshot_20260926_213725.png)
+![UTi-Thermal-Viewer Screenshot](assets/screenshot_20260926_214553.png)
 
 ---
 
@@ -29,8 +29,8 @@ Featuring an interactive native GUI built with [`egui`](https://github.com/emilk
 - **High-Temperature Alarm**: User-configurable alarm threshold with instant visual warning badges and status alerts.
 - **False-Color Palettes**: Instant one-click switching between **Ironbow**, **Rainbow**, **White Hot**, **Black Hot**, and **Red Hot (Hotspots)**.
 - **Built-in Thermal Simulation / Demo Mode**: Realistic synthetic thermal PCB scene with drifting hotspots when the camera is not plugged in, so you can test all features offline.
-- **One-Click Snapshots & Screenshots**: Capture timestamped thermal sensor PNGs (`📷 Snapshot`), full application window screenshots (`🖼 Screenshot`), and stream telemetry logs to CSV.
-- **Offline BMP Analysis Modal**: Load `.bmp` radiometric snapshots directly from the camera's SD card, inspect raw sensor data, and export clean PNGs and temperature CSVs.
+- **One-Click Snapshots, Screenshots & Data Logging**: Capture timestamped thermal sensor PNGs (`📷 Snapshot`), full application window screenshots (`🖼 Screenshot`), and stream live telemetry logs to **CSV** (`📊 Log CSV`) or **JSON Lines** (`📋 Log JSON`).
+- **Offline BMP Analysis Modal**: Load `.bmp` radiometric snapshots directly from the camera's SD card, inspect raw sensor data, and export clean PNGs, CSV temperature matrices, and JSON radiometric datasets.
 
 ### 🧰 Headless CLI & Automation
 - **Camera Auto-Discovery**: Detects connected UTi-260B devices across Linux (V4L2), Windows (MSMF), and macOS (AVFoundation).
@@ -101,17 +101,17 @@ The headless CLI tool is ideal for scripts, cron jobs, and headless Linux server
 # 1. Scan for connected thermal cameras
 cargo run --bin uti-thermal-viewer-cli -- detect
 
-# 2. Live telemetry dashboard in console (FPS, Max Temp, Warn Temp)
-cargo run --bin uti-thermal-viewer-cli -- stream
+# 2. Live telemetry dashboard in console with continuous CSV / JSON logging
+cargo run --bin uti-thermal-viewer-cli -- stream --csv telemetry.csv --json telemetry.jsonl
 
 # 3. Live 24-bit TrueColor thermal preview directly in terminal
 cargo run --bin uti-thermal-viewer-cli -- preview --width 80 --height 30
 
-# 4. Capture a single snapshot to PNG + telemetry to JSON
-cargo run --bin uti-thermal-viewer-cli -- capture -o thermal.png --json telemetry.json
+# 4. Capture a single snapshot to PNG + telemetry to JSON & CSV
+cargo run --bin uti-thermal-viewer-cli -- capture -o thermal.png --json telemetry.json --csv telemetry.csv
 
-# 5. Parse saved SD card BMP, export clean thermal PNG & CSV temperature matrix
-cargo run --bin uti-thermal-viewer-cli -- parse-bmp snapshot.bmp --export-png clean.png --export-csv temps.csv
+# 5. Parse saved SD card BMP, export clean thermal PNG, CSV matrix, & JSON dataset
+cargo run --bin uti-thermal-viewer-cli -- parse-bmp snapshot.bmp --export-png clean.png --export-csv temps.csv --export-json dataset.json
 ```
 
 ---

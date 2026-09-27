@@ -13,7 +13,7 @@ use crate::camera::{query_devices, DeviceInfo, UtiCamera};
 use crate::frame::LiveFrame;
 use crate::palette::Palette;
 use crate::simulated::SimulatedCamera;
-use crate::telemetry::Telemetry;
+use crate::telemetry::{Telemetry, TelemetryLogRecord};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TempUnit {
@@ -75,7 +75,8 @@ pub struct UtiApp {
 
     // Logging & offline analysis
     status_toast: Option<(String, Instant)>,
-    csv_logger: Option<(PathBuf, std::fs::File)>,
+    csv_logger: Option<(PathBuf, std::fs::File, u64)>,
+    json_logger: Option<(PathBuf, std::fs::File, u64)>,
     offline_bmp: Option<UtiBmpImage>,
 
     // Screenshot capture
@@ -129,6 +130,7 @@ impl UtiApp {
 
             status_toast: None,
             csv_logger: None,
+            json_logger: None,
             offline_bmp: None,
 
             screenshot_out,
@@ -219,13 +221,30 @@ impl UtiApp {
                 self.alarm_triggered = false;
             }
 
+            let record = TelemetryLogRecord {
+                timestamp: chrono::Local::now().to_rfc3339(),
+                elapsed_secs: t,
+                frame: self.frame_count,
+                max_temp_c: telem.max_temp_c,
+                warn_temp_c: telem.warn_temp_c,
+                min_temp_c: None,
+                center_temp_c: Some(center_temp),
+                emissivity: telem.emissivity,
+                fps: if self.fps > 0.0 { Some(self.fps) } else { None },
+            };
+
             // CSV logging
-            if let Some((_, file)) = &mut self.csv_logger {
-                let _ = writeln!(
-                    file,
-                    "{:.3},{:.2},{:.2},{:.2}",
-                    t, telem.max_temp_c, telem.warn_temp_c, telem.emissivity
-                );
+            if let Some((_, file, count)) = &mut self.csv_logger {
+                let _ = writeln!(file, "{}", record.to_csv_row());
+                *count += 1;
+            }
+
+            // JSON logging
+            if let Some((_, file, count)) = &mut self.json_logger {
+                if let Ok(line) = record.to_json_line() {
+                    let _ = writeln!(file, "{}", line);
+                    *count += 1;
+                }
             }
         }
 
@@ -286,9 +305,8 @@ impl UtiApp {
     }
 
     fn toggle_csv_logging(&mut self) {
-        if self.csv_logger.is_some() {
-            self.csv_logger = None;
-            self.set_toast("Stopped CSV temperature logging".into());
+        if let Some((path, _, count)) = self.csv_logger.take() {
+            self.set_toast(format!("Saved CSV log: {:?} ({} frames)", path, count));
         } else {
             let filename = PathBuf::from(format!(
                 "uti260b_log_{}.csv",
@@ -296,12 +314,32 @@ impl UtiApp {
             ));
             match OpenOptions::new().create(true).write(true).open(&filename) {
                 Ok(mut file) => {
-                    let _ = writeln!(file, "time_secs,max_temp_c,warn_temp_c,emissivity");
-                    self.set_toast(format!("Logging temperatures to {:?}", filename));
-                    self.csv_logger = Some((filename, file));
+                    let _ = writeln!(file, "{}", TelemetryLogRecord::csv_header());
+                    self.set_toast(format!("Logging CSV to {:?}", filename));
+                    self.csv_logger = Some((filename, file, 0));
                 }
                 Err(e) => {
                     self.set_toast(format!("Failed to start CSV log: {}", e));
+                }
+            }
+        }
+    }
+
+    fn toggle_json_logging(&mut self) {
+        if let Some((path, _, count)) = self.json_logger.take() {
+            self.set_toast(format!("Saved JSON log: {:?} ({} frames)", path, count));
+        } else {
+            let filename = PathBuf::from(format!(
+                "uti260b_log_{}.jsonl",
+                chrono::Local::now().format("%Y%m%d_%H%M%S")
+            ));
+            match OpenOptions::new().create(true).write(true).open(&filename) {
+                Ok(file) => {
+                    self.set_toast(format!("Logging JSON Lines to {:?}", filename));
+                    self.json_logger = Some((filename, file, 0));
+                }
+                Err(e) => {
+                    self.set_toast(format!("Failed to start JSON log: {}", e));
                 }
             }
         }
@@ -432,13 +470,23 @@ impl eframe::App for UtiApp {
                 }
 
                 // CSV recording button
-                let rec_label = if self.csv_logger.is_some() {
-                    "🔴 Stop CSV"
+                let csv_label = if let Some((_, _, count)) = &self.csv_logger {
+                    format!("🔴 Stop CSV ({})", count)
                 } else {
-                    "📊 Log CSV"
+                    "📊 Log CSV".to_string()
                 };
-                if ui.button(rec_label).clicked() {
+                if ui.button(csv_label).clicked() {
                     self.toggle_csv_logging();
+                }
+
+                // JSON recording button
+                let json_label = if let Some((_, _, count)) = &self.json_logger {
+                    format!("🔴 Stop JSON ({})", count)
+                } else {
+                    "📋 Log JSON".to_string()
+                };
+                if ui.button(json_label).clicked() {
+                    self.toggle_json_logging();
                 }
 
                 // Open BMP button
@@ -760,6 +808,13 @@ impl eframe::App for UtiApp {
                                 if let Some(path) = rfd::FileDialog::new().add_filter("CSV", &["csv"]).save_file() {
                                     let csv = bmp.export_temperature_csv();
                                     let _ = std::fs::write(path, csv);
+                                }
+                            }
+                            if ui.button("📋 Export JSON Radiometric Data").clicked() {
+                                if let Some(path) = rfd::FileDialog::new().add_filter("JSON", &["json"]).save_file() {
+                                    if let Ok(json_str) = bmp.export_temperature_json() {
+                                        let _ = std::fs::write(path, json_str);
+                                    }
                                 }
                             }
                         });
