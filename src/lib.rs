@@ -40,12 +40,16 @@ pub mod bmp;
 pub mod camera;
 pub mod error;
 pub mod frame;
+pub mod gui;
 pub mod palette;
+pub mod simulated;
 pub mod telemetry;
 
 pub use bmp::UtiBmpImage;
 pub use camera::{find_uti_camera, query_devices, DeviceInfo, UtiCamera};
 pub use error::{Error, Result};
 pub use frame::LiveFrame;
+pub use gui::UtiApp;
 pub use palette::Palette;
+pub use simulated::SimulatedCamera;
 pub use telemetry::Telemetry;
