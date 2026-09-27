@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use clap::{Parser, Subcommand};
-use uti260b::{query_devices, Palette, Result, UtiBmpImage, UtiCamera};
+use uti_thermal_viewer::{query_devices, Palette, Result, UtiBmpImage, UtiCamera};
 
 #[derive(Parser)]
-#[command(name = "uti260b-cli")]
+#[command(name = "uti-thermal-viewer-cli")]
 #[command(author = "leftger")]
 #[command(version = "0.1.0")]
 #[command(about = "CLI tool for UNI-T UTi260B thermal imaging camera", long_about = None)]

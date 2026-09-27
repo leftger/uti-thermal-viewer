@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 use clap::{Parser, Subcommand};
-use uti260b::{query_devices, Error, Palette, Result, UtiApp, UtiBmpImage, UtiCamera};
+use uti_thermal_viewer::{query_devices, Error, Palette, Result, UtiApp, UtiBmpImage, UtiCamera};
 
 #[derive(Parser)]
-#[command(name = "uti260b")]
+#[command(name = "uti-thermal-viewer")]
 #[command(author = "leftger")]
 #[command(version = "0.1.0")]
 #[command(about = "Thermal viewer, driver, and analysis tool for UNI-T UTi260B", long_about = None)]

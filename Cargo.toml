@@ -1,11 +1,11 @@
 [package]
-name = "uti260b"
+name = "uti-thermal-viewer"
 version = "0.1.0"
 edition = "2024"
 authors = ["leftger"]
 description = "Thermal camera viewer, driver, and analysis tool for UNI-T UTi260B"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/leftger/uti260b"
+repository = "https://github.com/leftger/uti-thermal-viewer"
 keywords = ["thermal", "camera", "uti260b", "uvc", "egui"]
 categories = ["hardware-support", "multimedia::video", "gui"]
 
@@ -23,9 +23,9 @@ egui_plot = "0.33"
 rfd = "0.15"
 
 [[bin]]
-name = "uti260b"
+name = "uti-thermal-viewer"
 path = "src/main.rs"
 
 [[bin]]
-name = "uti260b-cli"
+name = "uti-thermal-viewer-cli"
 path = "src/bin/cli.rs"

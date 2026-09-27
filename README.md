@@ -1,4 +1,4 @@
-# uti260b-rs
+# uti-thermal-viewer
 
 An open-source Rust library and command-line application for pulling live thermal video, images, and telemetry data from the **UNI-T UTi260B** handheld thermal camera.
 
@@ -67,7 +67,7 @@ Simply run:
 ```bash
 cargo run --release
 ```
-*(or `cargo run --bin uti260b`)*
+*(or `cargo run --bin uti-thermal-viewer`)*
 
 When the UTi-260B is connected and set to **"PC Camera"** in device settings, the app automatically connects to the live stream. If no camera is plugged in, it automatically enters **Demo / Simulation Mode** with realistic thermal scene dynamics so you can explore all features immediately!
 
@@ -77,48 +77,48 @@ When the UTi-260B is connected and set to **"PC Camera"** in device settings, th
 
 ### Build and Install
 ```bash
-cargo build --release --bin uti260b-cli
+cargo build --release --bin uti-thermal-viewer-cli
 ```
 
 ### Detect Connected Cameras
 ```bash
-cargo run --bin uti260b-cli -- detect
+cargo run --bin uti-thermal-viewer-cli -- detect
 ```
 
 ### Live Telemetry Streaming
 ```bash
-cargo run --bin uti260b-cli -- stream
+cargo run --bin uti-thermal-viewer-cli -- stream
 ```
 
 ### Terminal Live Thermal Preview (ASCII/ANSI TrueColor)
 ```bash
-cargo run --bin uti260b-cli -- preview --width 80 --height 30
+cargo run --bin uti-thermal-viewer-cli -- preview --width 80 --height 30
 ```
 
 ### Capture a Snapshot
 ```bash
-cargo run --bin uti260b-cli -- capture --output snapshot.png --json telemetry.json
+cargo run --bin uti-thermal-viewer-cli -- capture --output snapshot.png --json telemetry.json
 ```
 
 ### Parse an Exported BMP from Camera
 ```bash
-cargo run --bin uti260b-cli -- parse-bmp /path/to/capture.bmp --export-png clean_thermal.png --export-csv temperatures.csv
+cargo run --bin uti-thermal-viewer-cli -- parse-bmp /path/to/capture.bmp --export-png clean_thermal.png --export-csv temperatures.csv
 ```
 
 ---
 
 ## Rust Library Usage
 
-Add `uti260b` to your `Cargo.toml`:
+Add `uti-thermal-viewer` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-uti260b = { path = "../uti260b" }
+uti-thermal-viewer = { path = "../uti-thermal-viewer" }
 ```
 
 ### Example: Live Streaming and Frame Capture
 ```rust
-use uti260b::{UtiCamera, Result};
+use uti_thermal_viewer::{UtiCamera, Result};
 
 fn main() -> Result<()> {
     // Automatically find and open the UTi-260B
@@ -141,7 +141,7 @@ fn main() -> Result<()> {
 
 ### Example: Parsing Recorded BMP Radiometric Images
 ```rust
-use uti260b::{UtiBmpImage, Palette, Result};
+use uti_thermal_viewer::{UtiBmpImage, Palette, Result};
 
 fn main() -> Result<()> {
     let bmp = UtiBmpImage::from_file("sample.bmp")?;

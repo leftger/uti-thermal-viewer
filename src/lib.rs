@@ -1,4 +1,4 @@
-//! # uti260b
+//! # uti-thermal-viewer
 //!
 //! An open-source Rust library and application for capturing live video/image data
 //! and reading thermal telemetry from the **UNI-T UTi260B** handheld thermal camera.
@@ -18,7 +18,7 @@
 //! ## Example
 //!
 //! ```no_run
-//! use uti260b::{UtiCamera, Result};
+//! use uti_thermal_viewer::{UtiCamera, Result};
 //!
 //! fn main() -> Result<()> {
 //!     // Automatically discover and open the UTi-260B
