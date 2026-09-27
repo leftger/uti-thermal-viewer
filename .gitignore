@@ -3,6 +3,7 @@
 Cargo.lock
 .DS_Store
 *.png
+!assets/*.png
 *.bmp
 *.csv
 *.json

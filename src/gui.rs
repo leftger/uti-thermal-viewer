@@ -77,10 +77,15 @@ pub struct UtiApp {
     status_toast: Option<(String, Instant)>,
     csv_logger: Option<(PathBuf, std::fs::File)>,
     offline_bmp: Option<UtiBmpImage>,
+
+    // Screenshot capture
+    screenshot_out: Option<PathBuf>,
+    screenshot_requested_at: Option<Instant>,
+    pending_screenshot: Option<PathBuf>,
 }
 
 impl UtiApp {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, screenshot_out: Option<PathBuf>) -> Self {
         // Set visual styling to match dark scientific instrumentation theme
         let mut visuals = egui::Visuals::dark();
         visuals.panel_fill = Color32::from_rgb(18, 20, 24);
@@ -125,6 +130,10 @@ impl UtiApp {
             status_toast: None,
             csv_logger: None,
             offline_bmp: None,
+
+            screenshot_out,
+            screenshot_requested_at: None,
+            pending_screenshot: None,
         };
 
         // Attempt connecting to real camera if present
@@ -311,6 +320,40 @@ impl UtiApp {
 
 impl eframe::App for UtiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Screenshot collection
+        if let Some(path) = self.pending_screenshot.clone() {
+            let screenshot = ctx.input(|i| {
+                i.raw.events.iter().find_map(|ev| match ev {
+                    egui::Event::Screenshot { image, .. } => Some(image.clone()),
+                    _ => None,
+                })
+            });
+            if let Some(image) = screenshot {
+                self.pending_screenshot = None;
+                let [w, h] = image.size;
+                let mut raw = Vec::with_capacity(w * h * 4);
+                for p in &image.pixels {
+                    raw.extend_from_slice(&p.to_array());
+                }
+                if let Some(img) = image::RgbaImage::from_raw(w as u32, h as u32, raw) {
+                    let _ = img.save(&path);
+                    self.set_toast(format!("Saved window screenshot to {:?}", path));
+                }
+                if self.screenshot_out.is_some() {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+            }
+        }
+
+        // Automatic screenshot trigger for CLI screenshot mode
+        if let Some(path) = self.screenshot_out.clone() {
+            if self.frame_count >= 10 && self.pending_screenshot.is_none() && self.screenshot_requested_at.is_none() {
+                self.screenshot_requested_at = Some(Instant::now());
+                self.pending_screenshot = Some(path);
+                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(Default::default()));
+            }
+        }
+
         // Fetch next frame and update texture
         self.fetch_next_frame();
         self.update_texture(ctx);
@@ -318,7 +361,7 @@ impl eframe::App for UtiApp {
         // 1. Top Control Bar
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.heading("🔥 UTi260B Thermal Viewer");
+                ui.heading("🔥 UTi-Thermal-Viewer");
                 ui.separator();
 
                 // Connection badge

@@ -1,113 +1,118 @@
-# uti-thermal-viewer
+# 🔥 uti-thermal-viewer
 
-An open-source Rust library and command-line application for pulling live thermal video, images, and telemetry data from the **UNI-T UTi260B** handheld thermal camera.
+[![Rust](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org/)
+[![GUI](https://img.shields.io/badge/gui-egui%20%2F%20eframe-blue.svg)](https://github.com/emilk/egui)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green.svg)](LICENSE-MIT)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)]()
+
+An open-source, high-performance **Rust** desktop application, driver, and analysis toolkit for the **UNI-T UTi260B** handheld thermal imaging camera.
+
+Featuring an interactive native GUI built with [`egui`](https://github.com/emilk/egui) / [`eframe`](https://crates.io/crates/eframe) (Wgpu renderer), live radiometric telemetry extraction, real-time temperature trend graphing via [`egui_plot`](https://crates.io/crates/egui_plot), false-color palettes, offline SD card `.bmp` radiometric analysis, and headless CLI tools.
 
 ---
 
-## Technical Background & Reverse-Engineering Findings
+![UTi-Thermal-Viewer Screenshot](assets/screenshot.png)
 
-Analysis and reverse-engineering of the official UNI-T `UTi-Live-Screen-1.68.exe` software revealed how the camera communicates over USB:
+---
 
-1. **USB Interface & Device Discovery**:
-   - In the camera settings: **USB Mode** must be set to **"PC Camera"** (or Live Screen / screen projection mode).
-   - The camera enumerates as a standard **UVC (USB Video Class)** webcam device:
+## ⚡ Features
+
+### 🖥️ Native `egui` Desktop Application
+- **Live 25 FPS Video Viewport**: Scalable, aspect-ratio-preserved thermal stream with zero-copy YUYV conversion.
+- **Dynamic Crosshair Overlays**:
+  - 🔴 **Hot Spot Tracker (`H:`)**: Automatically pinpoints and labels the hottest pixel in real-time.
+  - 🔵 **Cold Spot Tracker (`L:`)**: Automatically pinpoints and labels the coldest pixel.
+  - 🟢 **Center Reticle (`C:`)**: Fixed center measurement with live temperature readout.
+  - 🟡 **Interactive Hover Inspector**: Hover anywhere on the thermal image with your mouse to inspect exact pixel coordinates and intensity values.
+- **Real-Time Temperature History Plot**: Rolling multi-channel temperature graph (`egui_plot`) displaying Max, Min, and Center temperatures over an adjustable time window (10s to 120s).
+- **Thermal Colorbar Scale**: Vertical false-color gradient bar with dynamic upper and lower temperature calibration tick marks.
+- **High-Temperature Alarm**: User-configurable alarm threshold with instant visual warning badges and status alerts.
+- **False-Color Palettes**: Instant one-click switching between **Ironbow**, **Rainbow**, **White Hot**, **Black Hot**, and **Red Hot (Hotspots)**.
+- **Built-in Thermal Simulation / Demo Mode**: Realistic synthetic thermal PCB scene with drifting hotspots when the camera is not plugged in, so you can test all features offline.
+- **One-Click Snapshots & CSV Logging**: Save timestamped PNG snapshots and stream telemetry logs to CSV.
+- **Offline BMP Analysis Modal**: Load `.bmp` radiometric snapshots directly from the camera's SD card, inspect raw sensor data, and export clean PNGs and temperature CSVs.
+
+### 🧰 Headless CLI & Automation
+- **Camera Auto-Discovery**: Detects connected UTi-260B devices across Linux (V4L2), Windows (MSMF), and macOS (AVFoundation).
+- **Console Telemetry Streamer**: High-speed console monitor printing live FPS, Max Temp, Warn Temp, and Emissivity.
+- **Terminal TrueColor Preview**: View live thermal imaging directly in your terminal using 24-bit ANSI colors (works over SSH and in headless environments!).
+- **Scriptable Captures**: Single-shot captures saving PNG/BMP images and JSON telemetry files.
+
+---
+
+## 🔬 Reverse-Engineering Insights
+
+Reverse-engineering the official UNI-T `UTi-Live-Screen-1.68.exe` binary revealed how the UTi-260B communicates over USB:
+
+1. **USB Interface & Discovery**:
+   - In the camera settings: **USB Mode** must be set to **"PC Camera"** (or Live Screen projection mode).
+   - The device enumerates as a standard **UVC (USB Video Class)** webcam:
      - **Vendor ID**: `0x1d6b` (Linux Foundation Gadget)
      - **Product ID**: `0x0102`
      - **Device Name**: `UVC Camera`
 
 2. **Live Video Stream**:
-   - **Resolution**: `320 x 240` @ 25 FPS
-   - **Pixel Format**: `YUYV` (`YUY2`, 4:2:2 chroma subsampled, 2 bytes/pixel)
+   - **Resolution**: `320 x 240` @ 25 FPS.
+   - **Pixel Format**: `YUYV` (`YUY2`, 4:2:2 chroma subsampled, 2 bytes/pixel).
    - **Video Buffer Size**: `320 * 240 * 2 = 153,600` bytes (`0x25800`).
 
-3. **Live Telemetry Footer**:
-   - Immediately following the video payload (at byte offset `153,600` / `0x25800`), the camera sends real-time telemetry metadata:
-     - `offset + 0x00`: Little-endian `i16` / `10.0` = **Maximum Temperature** in °C.
-     - `offset + 0x02`: Little-endian `i16` / `10.0` = **Warning / Minimum Temperature** in °C.
-     - `offset + 0x04`: Little-endian `u16` / `100.0` = **Emissivity** factor.
+3. **Live Telemetry Footer (Offset `0x25800` / 153,600)**:
+   The camera embeds real-time radiometric telemetry directly after the video pixels in every frame:
+   - `+0x00..+0x01`: `i16` (little-endian) $/ 10.0$ = **Maximum Temperature** in °C.
+   - `+0x02..+0x03`: `i16` (little-endian) $/ 10.0$ = **Alarm / Minimum Temperature** in °C.
+   - `+0x04..+0x05`: `u16` (little-endian) $/ 100.0$ = **Emissivity** factor.
 
 4. **Snapshot BMP Structure (SD Card / Recorded Images)**:
-   - Contains a standard Windows 24-bit BMP image (with UI overlays).
-   - Appended to the end of the BMP is:
-     - Raw 8-bit thermal sensor intensities (`width * height` bytes).
-     - 512 bytes 256-color RGB565 palette.
-     - 26 bytes calibration & temperature telemetry block (`T_max`, `T_min`, `T_center`, emissivity, coordinates).
-     - Allows reconstructing full floating-point temperature matrices and exporting clean thermal images without UI overlays.
+   - Standard 24-bit BGR image data with UI overlays.
+   - Appended trailer includes raw 8-bit thermal sensor intensities, a 512-byte RGB565 palette, and calibration anchor points (`T_max`, `T_min`, `T_center`, emissivity, coordinates).
+   - Allows calculating full floating-point temperature matrices and exporting clean thermal images without UI overlays.
 
 ---
 
 > [!WARNING]
-> **Hardware Power Warning**: Community tests on EEVblog show that the UTi260B internal power regulation circuitry can be damaged by certain USB-C PD fast chargers. Always connect the device using a standard 5V-only USB-A to USB-C cable.
+> **Hardware Power Warning**: EEVblog hardware testing reports that the UTi260B internal power regulation circuitry can be damaged by certain USB-C PD fast chargers. Always connect the camera using a standard 5V-only USB-A to USB-C cable.
 
 ---
 
-## Features
+## 🚀 Quickstart
 
-- **Rich `egui` Native Desktop Application**: Built with `eframe` (Wgpu backend) featuring:
-  - **Live 25 FPS Video Viewport**: Scalable display of the camera stream with aspect-ratio preservation.
-  - **Real-Time Temperature History Plot**: Rolling multi-channel temperature graph (`egui_plot`) displaying Max, Min, and Center temperatures over time.
-  - **Dynamic Spot Overlays**:
-    - 🔴 **Hot Spot Tracker**: Real-time crosshair tracking the hottest pixel with temperature label.
-    - 🔵 **Cold Spot Tracker**: Real-time crosshair tracking the coldest pixel.
-    - 🟢 **Center Crosshair**: Reticle displaying center spot temperature.
-    - 🟡 **Interactive Hover Inspector**: Hover over any pixel on the live feed to inspect pixel coordinates and temperatures.
-  - **Visual Thermal Colorbar**: Gradient temperature bar with dynamic tick labels.
-  - **High-Temperature Alarm**: Configurable alarm threshold with visual warning alerts.
-  - **Built-in Thermal Simulation / Demo Mode**: Realistic synthetic thermal PCB scene with drifting hotspots when the camera is not plugged in, so you can test all features offline.
-  - **One-Click Snapshots & CSV Logging**: Save PNG snapshots and record temperature telemetry to CSV.
-  - **Offline BMP Analysis Modal**: Load any `.bmp` saved on the camera's SD card, inspect raw radiometric data, and export clean PNGs and temperature CSVs.
-- **Automatic Device Discovery**: Auto-detects connected UTi-260B devices across Linux (V4L2), Windows (MSMF), and macOS (AVFoundation).
-- **Headless CLI Tools**: Stream telemetry, capture frames, preview in terminal via ANSI 24-bit TrueColor, or parse SD card images.
-
----
-
-## Launching the GUI App
-
-Simply run:
+### Launch the GUI Application
 ```bash
 cargo run --release
 ```
-*(or `cargo run --bin uti-thermal-viewer`)*
+*(If no camera is connected, the app automatically starts in **Demo / Simulation Mode** with realistic thermal scene dynamics so you can explore all features immediately!)*
 
-When the UTi-260B is connected and set to **"PC Camera"** in device settings, the app automatically connects to the live stream. If no camera is plugged in, it automatically enters **Demo / Simulation Mode** with realistic thermal scene dynamics so you can explore all features immediately!
+### Take an Automated Window Screenshot
+```bash
+cargo run --release -- --screenshot assets/screenshot.png
+```
 
 ---
 
-## CLI Usage
+## ⌨️ CLI Usage
 
-### Build and Install
-```bash
-cargo build --release --bin uti-thermal-viewer-cli
-```
+The headless CLI tool is ideal for scripts, cron jobs, and headless Linux servers:
 
-### Detect Connected Cameras
 ```bash
+# 1. Scan for connected thermal cameras
 cargo run --bin uti-thermal-viewer-cli -- detect
-```
 
-### Live Telemetry Streaming
-```bash
+# 2. Live telemetry dashboard in console (FPS, Max Temp, Warn Temp)
 cargo run --bin uti-thermal-viewer-cli -- stream
-```
 
-### Terminal Live Thermal Preview (ASCII/ANSI TrueColor)
-```bash
+# 3. Live 24-bit TrueColor thermal preview directly in terminal
 cargo run --bin uti-thermal-viewer-cli -- preview --width 80 --height 30
-```
 
-### Capture a Snapshot
-```bash
-cargo run --bin uti-thermal-viewer-cli -- capture --output snapshot.png --json telemetry.json
-```
+# 4. Capture a single snapshot to PNG + telemetry to JSON
+cargo run --bin uti-thermal-viewer-cli -- capture -o thermal.png --json telemetry.json
 
-### Parse an Exported BMP from Camera
-```bash
-cargo run --bin uti-thermal-viewer-cli -- parse-bmp /path/to/capture.bmp --export-png clean_thermal.png --export-csv temperatures.csv
+# 5. Parse saved SD card BMP, export clean thermal PNG & CSV temperature matrix
+cargo run --bin uti-thermal-viewer-cli -- parse-bmp snapshot.bmp --export-png clean.png --export-csv temps.csv
 ```
 
 ---
 
-## Rust Library Usage
+## 📦 Rust Library Usage
 
 Add `uti-thermal-viewer` to your `Cargo.toml`:
 
@@ -116,7 +121,7 @@ Add `uti-thermal-viewer` to your `Cargo.toml`:
 uti-thermal-viewer = { path = "../uti-thermal-viewer" }
 ```
 
-### Example: Live Streaming and Frame Capture
+### Live Streaming and Telemetry
 ```rust
 use uti_thermal_viewer::{UtiCamera, Result};
 
@@ -132,14 +137,15 @@ fn main() -> Result<()> {
         println!("Warn: {:.1}°C, Emissivity: {:.2}", telem.warn_temp_c, telem.emissivity);
     }
 
-    // Save as PNG
+    // Save as PNG or convert to RGB
     frame.save_png("live_snapshot.png")?;
+    let _rgb_image = frame.to_rgb_image();
 
     Ok(())
 }
 ```
 
-### Example: Parsing Recorded BMP Radiometric Images
+### Parsing Recorded BMP Radiometric Images
 ```rust
 use uti_thermal_viewer::{UtiBmpImage, Palette, Result};
 
@@ -162,7 +168,7 @@ fn main() -> Result<()> {
 
 ---
 
-## License
+## 📜 License
 
 Dual-licensed under either of:
 - Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))

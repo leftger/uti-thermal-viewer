@@ -8,6 +8,10 @@ use uti_thermal_viewer::{query_devices, Error, Palette, Result, UtiApp, UtiBmpIm
 #[command(version = "0.1.0")]
 #[command(about = "Thermal viewer, driver, and analysis tool for UNI-T UTi260B", long_about = None)]
 struct Cli {
+    /// Save a GUI screenshot to the specified PNG file and exit
+    #[arg(long)]
+    screenshot: Option<PathBuf>,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -80,7 +84,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        None | Some(Commands::Gui) => run_gui()?,
+        None | Some(Commands::Gui) => run_gui(cli.screenshot)?,
 
         Some(Commands::Detect) => {
             println!("Scanning for connected video devices...");
@@ -216,20 +220,20 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_gui() -> Result<()> {
+fn run_gui(screenshot: Option<PathBuf>) -> Result<()> {
     let options = eframe::NativeOptions {
         renderer: eframe::Renderer::Wgpu,
         viewport: eframe::egui::ViewportBuilder::default()
             .with_inner_size([1180.0, 740.0])
             .with_min_inner_size([720.0, 480.0])
-            .with_title("UTi260B Thermal Camera Viewer"),
+            .with_title("UTi-Thermal-Viewer"),
         ..Default::default()
     };
 
     eframe::run_native(
-        "UTi260B Thermal Camera Viewer",
+        "UTi-Thermal-Viewer",
         options,
-        Box::new(|cc| Ok(Box::new(UtiApp::new(cc)))),
+        Box::new(move |cc| Ok(Box::new(UtiApp::new(cc, screenshot)))),
     )
     .map_err(|e| Error::Capture(format!("GUI runtime error: {}", e)))?;
 
