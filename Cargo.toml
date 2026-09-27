@@ -8,6 +8,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/leftger/uti-thermal-viewer"
 keywords = ["thermal", "camera", "uti260b", "uvc", "egui"]
 categories = ["hardware-support", "multimedia::video", "gui"]
+default-run = "uti-thermal-viewer"
 
 [dependencies]
 nokhwa = { version = "0.10.11", default-features = false, features = ["input-native", "decoding"] }
