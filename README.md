@@ -40,34 +40,8 @@ Featuring an interactive native GUI built with [`egui`](https://github.com/emilk
 
 ---
 
-## 🔬 Reverse-Engineering Insights
-
-Reverse-engineering the official UNI-T `UTi-Live-Screen-1.68.exe` binary revealed how the UTi-260B communicates over USB:
-
-1. **USB Interface & Discovery**:
-   - In the camera settings: **USB Mode** must be set to **"PC Camera"** (or Live Screen projection mode).
-   - The device enumerates as a standard **UVC (USB Video Class)** webcam:
-     - **Vendor ID**: `0x1d6b` (Linux Foundation Gadget)
-     - **Product ID**: `0x0102`
-     - **Device Name**: `UVC Camera`
-
-2. **Live Video Stream**:
-   - **Resolution**: `320 x 240` @ 25 FPS.
-   - **Pixel Format**: `YUYV` (`YUY2`, 4:2:2 chroma subsampled, 2 bytes/pixel).
-   - **Video Buffer Size**: `320 * 240 * 2 = 153,600` bytes (`0x25800`).
-
-3. **Live Telemetry Footer (Offset `0x25800` / 153,600)**:
-   The camera embeds real-time radiometric telemetry directly after the video pixels in every frame:
-   - `+0x00..+0x01`: `i16` (little-endian) $/ 10.0$ = **Maximum Temperature** in °C.
-   - `+0x02..+0x03`: `i16` (little-endian) $/ 10.0$ = **Alarm / Minimum Temperature** in °C.
-   - `+0x04..+0x05`: `u16` (little-endian) $/ 100.0$ = **Emissivity** factor.
-
-4. **Snapshot BMP Structure (SD Card / Recorded Images)**:
-   - Standard 24-bit BGR image data with UI overlays.
-   - Appended trailer includes raw 8-bit thermal sensor intensities, a 512-byte RGB565 palette, and calibration anchor points (`T_max`, `T_min`, `T_center`, emissivity, coordinates).
-   - Allows calculating full floating-point temperature matrices and exporting clean thermal images without UI overlays.
-
----
+> [!NOTE]
+> **Camera Configuration**: In the camera device menu, ensure **USB Mode** is set to **"PC Camera"**.
 
 > [!WARNING]
 > **Hardware Power Warning**: EEVblog hardware testing reports that the UTi260B internal power regulation circuitry can be damaged by certain USB-C PD fast chargers. Always connect the camera using a standard 5V-only USB-A to USB-C cable.
