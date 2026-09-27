@@ -8,9 +8,9 @@ use uti_thermal_viewer::{query_devices, Error, Palette, Result, UtiApp, UtiBmpIm
 #[command(version = "0.1.0")]
 #[command(about = "Thermal viewer, driver, and analysis tool for UNI-T UTi260B", long_about = None)]
 struct Cli {
-    /// Save a GUI screenshot to the specified PNG file and exit
-    #[arg(long)]
-    screenshot: Option<PathBuf>,
+    /// Save a GUI screenshot to a PNG file (with timestamp) and exit
+    #[arg(long, value_name = "PATH", num_args = 0..=1, default_missing_value = "auto")]
+    screenshot: Option<String>,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -83,8 +83,34 @@ enum Commands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    let screenshot_path = cli.screenshot.map(|raw| {
+        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+        let default_name = format!("screenshot_{}.png", timestamp);
+        if raw.is_empty() || raw == "auto" {
+            PathBuf::from(default_name)
+        } else {
+            let p = PathBuf::from(&raw);
+            if p.is_dir() || raw.ends_with('/') || raw.ends_with('\\') {
+                p.join(default_name)
+            } else if p.file_name().and_then(|f| f.to_str()) == Some("screenshot.png") {
+                let parent = p.parent().unwrap_or(std::path::Path::new(""));
+                parent.join(default_name)
+            } else if p.extension().is_none() {
+                if p.exists() && p.is_dir() {
+                    p.join(default_name)
+                } else {
+                    let mut os = p.into_os_string();
+                    os.push(format!("_{}.png", timestamp));
+                    PathBuf::from(os)
+                }
+            } else {
+                p
+            }
+        }
+    });
+
     match cli.command {
-        None | Some(Commands::Gui) => run_gui(cli.screenshot)?,
+        None | Some(Commands::Gui) => run_gui(screenshot_path)?,
 
         Some(Commands::Detect) => {
             println!("Scanning for connected video devices...");

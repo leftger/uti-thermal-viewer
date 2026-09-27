@@ -11,7 +11,7 @@ Featuring an interactive native GUI built with [`egui`](https://github.com/emilk
 
 ---
 
-![UTi-Thermal-Viewer Screenshot](assets/screenshot.png)
+![UTi-Thermal-Viewer Screenshot](assets/screenshot_20260926_213725.png)
 
 ---
 
@@ -29,7 +29,7 @@ Featuring an interactive native GUI built with [`egui`](https://github.com/emilk
 - **High-Temperature Alarm**: User-configurable alarm threshold with instant visual warning badges and status alerts.
 - **False-Color Palettes**: Instant one-click switching between **Ironbow**, **Rainbow**, **White Hot**, **Black Hot**, and **Red Hot (Hotspots)**.
 - **Built-in Thermal Simulation / Demo Mode**: Realistic synthetic thermal PCB scene with drifting hotspots when the camera is not plugged in, so you can test all features offline.
-- **One-Click Snapshots & CSV Logging**: Save timestamped PNG snapshots and stream telemetry logs to CSV.
+- **One-Click Snapshots & Screenshots**: Capture timestamped thermal sensor PNGs (`📷 Snapshot`), full application window screenshots (`🖼 Screenshot`), and stream telemetry logs to CSV.
 - **Offline BMP Analysis Modal**: Load `.bmp` radiometric snapshots directly from the camera's SD card, inspect raw sensor data, and export clean PNGs and temperature CSVs.
 
 ### 🧰 Headless CLI & Automation
@@ -84,7 +84,11 @@ cargo run --release
 
 ### Take an Automated Window Screenshot
 ```bash
-cargo run --release -- --screenshot assets/screenshot.png
+# Save timestamped GUI screenshot to current directory (e.g. screenshot_20260926_213725.png)
+cargo run --release -- --screenshot
+
+# Or save timestamped screenshot to the assets/ directory
+cargo run --release -- --screenshot assets/
 ```
 
 ---

@@ -278,6 +278,13 @@ impl UtiApp {
         }
     }
 
+    fn take_window_screenshot(&mut self, ctx: &egui::Context) {
+        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+        let filename = PathBuf::from(format!("screenshot_{}.png", timestamp));
+        self.pending_screenshot = Some(filename);
+        ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(Default::default()));
+    }
+
     fn toggle_csv_logging(&mut self) {
         if self.csv_logger.is_some() {
             self.csv_logger = None;
@@ -336,8 +343,16 @@ impl eframe::App for UtiApp {
                     raw.extend_from_slice(&p.to_array());
                 }
                 if let Some(img) = image::RgbaImage::from_raw(w as u32, h as u32, raw) {
-                    let _ = img.save(&path);
-                    self.set_toast(format!("Saved window screenshot to {:?}", path));
+                    if let Some(parent) = path.parent() {
+                        if !parent.as_os_str().is_empty() {
+                            let _ = std::fs::create_dir_all(parent);
+                        }
+                    }
+                    if let Err(e) = img.save(&path) {
+                        self.set_toast(format!("Failed to save screenshot: {}", e));
+                    } else {
+                        self.set_toast(format!("Saved window screenshot to {:?}", path));
+                    }
                 }
                 if self.screenshot_out.is_some() {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -409,6 +424,11 @@ impl eframe::App for UtiApp {
                 // Snapshot button
                 if ui.button("📷 Snapshot").clicked() {
                     self.take_snapshot();
+                }
+
+                // Window Screenshot button
+                if ui.button("🖼 Screenshot").clicked() {
+                    self.take_window_screenshot(ctx);
                 }
 
                 // CSV recording button
